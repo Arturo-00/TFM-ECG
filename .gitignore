@@ -1,0 +1,4 @@
+./*/.env/
+./*/.vscode/
+./ECG_ID_dataset/
+./*/__pycache__/

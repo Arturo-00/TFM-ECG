@@ -20,7 +20,7 @@ from sklearn.metrics import accuracy_score
 
 DATASET_PATH="./ECG_ID_dataset/physionet.org/files/ecgiddb/1.0.0/"
 PYTORCH_DATASET_PATH = "./ECG_ID_dataset/pytorchdata/dataset.pt"
-PYTORCH_MODEL_PATH = "./ECG_ID_dataset/pytorchdata/ECG1DCNN.pt"
+PYTORCH_MODEL_PATH = "./ECG_ID_dataset/pytorchdata/ECG1DCNN.pth"
 TEMPLATES_DATASET_PATH = "./ECG_ID_dataset/dataset_templates.csv"
 # MODEL_ACTION="TRAIN"
 MODEL_ACTION="LOAD"

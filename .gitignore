@@ -1,4 +1,4 @@
-./*/.env/
-./*/.vscode/
-./ECG_ID_dataset/
-./*/__pycache__/
+ECG_ID_dataset/
+.env/
+.vscode/launch.json
+.vscode/settings.json

@@ -60,12 +60,9 @@ class ECG_1D_CNN(nn.Module):
         #250x1
         self.conv1 = nn.Conv1d(in_channels=1, out_channels=32, kernel_size=5, stride=1, padding=2)
         self.conv2 = nn.Conv1d(in_channels=32, out_channels=64, kernel_size=5, stride=1, padding=2)
-        # self.conv3 = nn.Conv1d(in_channels=64, out_channels=128, kernel_size=5, stride=1, padding=2)
-        # self.conv4 = nn.Conv1d(in_channels=128, out_channels=256, kernel_size=5, stride=1, padding=2)
+
         self.batch_norm1 = nn.BatchNorm1d(32)
         self.batch_norm2 = nn.BatchNorm1d(64)
-        # self.batch_norm3 = nn.BatchNorm1d(128)
-        # self.batch_norm4 = nn.BatchNorm1d(256)
 
         self.pool =  nn.MaxPool1d(kernel_size=4, stride=2, padding=0)
 
@@ -80,40 +77,36 @@ class ECG_1D_CNN(nn.Module):
         self.linear3 = nn.Linear(int(self.final_dim*self.final_channels/8), nLabels)
 
         self.relu = nn.ReLU()
-        self.logsoftmax = nn.LogSoftmax(dim=1)  #Potentially change
+        self.logsoftmax = nn.LogSoftmax(dim=1) 
 
         
-    def forward(self, x):
+    def forward(self, x, reg=True):
         # Pass the input tensor through the CNN operations
         x = self.conv1(x)
-        x = self.batch_norm1(x) 
+        if reg:
+            x = self.batch_norm1(x) 
         x = self.relu(x) 
         x = self.pool(x)
         x = self.conv2(x)
-        x = self.batch_norm2(x) 
+        if reg:
+            x = self.batch_norm2(x) 
         x = self.relu(x)
         x = self.pool(x)
-        # x = self.conv3(x)
-        # # x = self.batch_norm3(x) 
-        # x = self.relu(x)
-        # x = self.pool(x)
-        # x = self.conv4(x)
-        # x = self.batch_norm4(x) 
-        # x = self.relu(x)
-        # x = self.pool(x)
 
-        # print(x.shape)
         # Flatten the tensor into a vector of appropriate dimension using self.final_dim
         x = x.view(-1, self.final_dim*self.final_channels) 
 
         # Pass the tensor through the Dense Layers
-        x = nn.Dropout(p=0.5)(x)
+        if reg:
+            x = nn.Dropout(p=0.5)(x)
         x = self.linear1(x)
         x = self.relu(x)
-        x = nn.Dropout(p=0.5)(x)
+        if reg:
+            x = nn.Dropout(p=0.5)(x)
         x = self.linear2(x)
         x = self.relu(x)
-        x = nn.Dropout(p=0.3)(x)
+        if reg:
+            x = nn.Dropout(p=0.3)(x)
         x = self.linear3(x)
         x = self.logsoftmax(x) 
         return x
@@ -135,7 +128,7 @@ class ECG_1D_CNN_TRAINER(ECG_1D_CNN):
         print("DETECTED DEVICE %s"%(self.device))
         self.to(self.device)
 
-    def trainloop(self,trainingLoader,validationLoader, earlyStopper= lambda x,y: (False, None)):
+    def trainloop(self,trainingLoader,validationLoader, earlyStopper= lambda x,y: (False, None), reg=True):
 
         for e in range(int(self.epochs)):
             start_time = time.time()
@@ -145,7 +138,7 @@ class ECG_1D_CNN_TRAINER(ECG_1D_CNN):
             for beats, labels in trainingLoader:              
                 self.optim.zero_grad() 
                 beats, labels = beats.to(self.device), labels.to(self.device)  
-                out = self.forward(beats.view(beats.shape[0], 1, beats.shape[1])) 
+                out = self.forward(beats.view(beats.shape[0], 1, beats.shape[1]),reg) 
 
                 loss = self.criterion(out,labels)
                 running_loss += loss.item()
@@ -162,7 +155,7 @@ class ECG_1D_CNN_TRAINER(ECG_1D_CNN):
     
                 for beats,labels in validationLoader:
                     beats, labels = beats.to(self.device), labels.to(self.device)  
-                    out = self.forward(beats.view(beats.shape[0],1,beats.shape[1])) 
+                    out = self.forward(beats.view(beats.shape[0],1,beats.shape[1]),reg) 
                     loss = self.criterion(out,labels) #Evaluation!
                     running_loss += loss.item()   
                         

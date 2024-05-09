@@ -130,6 +130,7 @@ class ECG_1D_CNN_TRAINER(ECG_1D_CNN):
 
     def trainloop(self,trainingLoader,validationLoader, earlyStopper= lambda x,y: (False, None), reg=True):
 
+        tot_t = time.time()
         for e in range(int(self.epochs)):
             start_time = time.time()
             running_loss = 0.
@@ -173,6 +174,7 @@ class ECG_1D_CNN_TRAINER(ECG_1D_CNN):
                 if(best_model_dict is not None):
                     self.load_state_dict(best_model_dict, assign=True) #best scoring weights
                 break
+        print("Total training time for %d epochs: %f seconds" %(e+1,(time.time() - tot_t)))
 
     def eval_performance(self,dataloader):
         self.eval()

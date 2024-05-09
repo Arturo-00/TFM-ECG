@@ -169,3 +169,14 @@ class ECG_DATAHANDLER:
             else:
                 print("File %s does not exist. Creating a new dataset"%(path))
                 return self.transform_data_to_dataset(path,action="SAVE")
+            
+    def transform_df_to_dataset(self, df):
+        X = df.iloc[:, :-1]  # Features (all columns except the last one)
+        y = df.iloc[:, -1]   # Target variable (last column)
+        
+        tensor_X = torch.tensor(X.values,dtype=torch.float32)
+        tensor_y = torch.tensor(y.values, dtype=torch.int)
+
+        dataset = ECGDataset(tensor_X, tensor_y)
+
+        return dataset

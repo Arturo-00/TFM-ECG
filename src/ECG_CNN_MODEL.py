@@ -1,30 +1,58 @@
 import torch
 import time
 import numpy as np
+import seaborn as sns
 import copy
 import torch.nn as nn
 import torch.optim as optim
 import matplotlib.pyplot as plt
-from sklearn.metrics import accuracy_score,precision_score, recall_score, f1_score, roc_curve, roc_auc_score, precision_recall_curve
+from sklearn.metrics import accuracy_score,precision_score, recall_score, f1_score, confusion_matrix,precision_recall_fscore_support
 
 class MetricsHolder:
-    def __init__(self, y_true, y_pred) :
+    def __init__(self, y_true, y_pred, scores) :
         self.y_true=y_true
         self.y_pred=y_pred
+        self.scores = scores
         self.accuracy=accuracy_score(y_true,y_pred)
 
-    def calculate_accuracy(self):
+    def calculate_recognition_rate(self):
         return round(self.accuracy*100, 4)
     
+    def rank_n_accuracy(self, n):
+        correct = 0
+        for i, true_label in enumerate(self.y_true):
+            top_n_indices = np.argsort(self.scores[i])[-n:]  # Indices of the top N scores
+            if true_label in top_n_indices:
+                correct += 1
+        return round(correct *100 / len(self.y_true), 4)
+    
     def calculate_weighted_precision(self):
-        return round(precision_score(self.y_true, self.y_pred, average='weighted')*100,4)
+        return round(precision_score(self.y_true, self.y_pred, zero_division=1, average='weighted')*100,4)
     
     def calculate_weighted_recall(self):
         return round(recall_score(self.y_true, self.y_pred, average='weighted')*100,4)
     
     def calculate_weighted_f1_score(self):
         return round(f1_score(self.y_true, self.y_pred, average='weighted')*100,4)
-  
+    
+    
+    def plot_cmc_curve(self, max_rank=5):
+        cmc = np.zeros(max_rank)
+        for i, true_label in enumerate(self.y_true):
+            sorted_scores_indices = np.argsort(self.scores[i])[::-1]  # Indices of scores sorted in descending order
+            rank = np.where(sorted_scores_indices == true_label)[0][0] + 1
+            if rank <= max_rank:
+                cmc[rank-1:] += 1
+
+        cmc = cmc / len(self.y_true)
+
+        plt.plot(range(1, max_rank + 1), cmc, marker='o')
+        plt.xlabel('Rank')
+        plt.ylabel('Recognition Rate')
+        plt.title('CMC Curve')
+        plt.grid(True)
+        plt.show()
+    
 
 class EarlyStopper:
     def __init__(self, patience=5, delta=0, verbose=False):
@@ -69,7 +97,7 @@ class ECG_1D_CNN(nn.Module):
         #Spatial dimension of the signal at the output of the 2nd ConvLayer and 2ndPool!
         self.final_dim = 73
         self.final_channels = 64
-        print(nLabels,beatLength,self.final_dim,self.final_dim*self.final_channels)
+        print(f"Nusers:{nLabels}, beat Length: {beatLength} datapoints.")
 
         #Dense Layers
         self.linear1 = nn.Linear(self.final_dim*self.final_channels,   int(self.final_dim*self.final_channels/2))
@@ -180,6 +208,7 @@ class ECG_1D_CNN_TRAINER(ECG_1D_CNN):
         self.eval()
         y_pred = []
         y_real = []
+        scores = []
         # Turn off gradients for validation, saves memory and computations
         with torch.no_grad():
 
@@ -188,11 +217,12 @@ class ECG_1D_CNN_TRAINER(ECG_1D_CNN):
                 beats, labels = beats.to(self.device), labels.to(self.device)  
                 probs = self.forward(beats.view(beats.shape[0],1,beats.shape[1])) 
                 _, top_class = probs.topk(1, dim=1)
-
+                
+                scores.append(probs.cpu().numpy())
                 y_pred.extend(top_class.cpu().numpy().T[0])
                 y_real.extend(labels.cpu().numpy())
 
-            return MetricsHolder(y_true=y_real, y_pred=y_pred)
+            return MetricsHolder(y_true=y_real, y_pred=y_pred, scores = np.vstack(scores))
         
     def activation_maximization(self, target_class, delta= 1, verbose=False):
         self.eval()  

@@ -24,6 +24,7 @@ PYTORCH_MODEL_PATH = "./ECG_ID_dataset/pytorchdata/ECG1DCNN.pth"
 TEMPLATES_DATASET_PATH = "./ECG_ID_dataset/dataset_templates.csv"
 # MODEL_ACTION="TRAIN"
 MODEL_ACTION="LOAD"
+CREATE_TEMPLATES = False
 
 
 if __name__ == "__main__":
@@ -68,20 +69,20 @@ if __name__ == "__main__":
         model.load_state_dict(torch.load(PYTORCH_MODEL_PATH), assign=True)
 
     metrics = model.eval_performance(trainingLoader)
-    print("TRAINING ACC", metrics.calculate_accuracy())
+    print("TRAINING RR", metrics.calculate_recognition_rate())
     print("TRAINING Precision",metrics.calculate_weighted_precision())
     print("TRAINING Recall",metrics.calculate_weighted_recall())
     print("TRAINING F1-Score",metrics.calculate_weighted_f1_score())
 
     print("")
     metrics = model.eval_performance(validationLoader)
-    print("VALIDATION ACC",metrics.calculate_accuracy())
+    print("VALIDATION RR",metrics.calculate_recognition_rate())
     print("VALIDATION Precision",metrics.calculate_weighted_precision())
     print("VALIDATION Recall",metrics.calculate_weighted_recall())
     print("VALIDATION F1-Score",metrics.calculate_weighted_f1_score())
 
-    # model.create_templates(knowledge_dict, n_pass=5, savePath=TEMPLATES_DATASET_PATH, save=True, plot=True)
-
+    if CREATE_TEMPLATES:
+        model.create_templates(knowledge_dict, n_pass=5, savePath=TEMPLATES_DATASET_PATH, save=True, plot=True)
 
     ## EVALUATE THE WHOLE NET?
 
@@ -93,26 +94,24 @@ if __name__ == "__main__":
     metrics = model.eval_performance(template_loader)
 
     print("")
-    print("TEMPLATES ACC",metrics.calculate_accuracy())
+    print("TEMPLATES RR",metrics.calculate_recognition_rate())
     print("TEMPLATES Precision",metrics.calculate_weighted_precision())
     print("TEMPLATES Recall",metrics.calculate_weighted_recall())
     print("TEMPLATES F1-Score",metrics.calculate_weighted_f1_score())
+    metrics.plot_cmc_curve()
 
 
-    ## EVALUATE IF ANOTHER MODEL CAN TRAIN FROM TEMPLATES:
+    # EVALUATE IF ANOTHER MODEL CAN TRAIN FROM TEMPLATES:
 
-    # Step 1: Load the data from the CSV file without a header
-    # data = pd.read_csv(TEMPLATES_DATASET_PATH, header=None)
-
-    # # # Step 2: Separate features (X) and target variable (y)
+    # Step 2: Separate features (X) and target variable (y)
     X = data.iloc[:, :-1]  # Features (all columns except the last one)
     y = data.iloc[:, -1]   # Target variable (last column)
 
-    # # Step 3: Split the data into training and testing sets
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+    # Step 3: Split the data into training and testing sets
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, stratify=y)
 
     # Define the Random Forest classifier
-    rf_classifier = RandomForestClassifier(random_state=42)
+    rf_classifier = RandomForestClassifier()
 
     # Define the grid of hyperparameters to search over
     param_grid = {
@@ -123,7 +122,7 @@ if __name__ == "__main__":
     }
 
     # Perform cross-validation grid search TODO Stratified is giving out an error...
-    grid_search = GridSearchCV(estimator=rf_classifier, param_grid=param_grid, cv=StratifiedKFold(n_splits=4, shuffle=True, random_state=42), scoring='accuracy', verbose=2)
+    grid_search = GridSearchCV(estimator=rf_classifier, param_grid=param_grid, cv=StratifiedKFold(n_splits=4, shuffle=True), scoring='accuracy', verbose=2)
     grid_search.fit(X_train, y_train)
 
     # Get the best parameters and the corresponding accuracy
@@ -133,14 +132,18 @@ if __name__ == "__main__":
     # Predict on the testing set using the best model
     best_rf_classifier = grid_search.best_estimator_
     y_pred = best_rf_classifier.predict(X_test)
+    scores = best_rf_classifier.predict_proba(X_test)
 
     # Evaluate the model
     # 85 percent ACC with 4 traning instances and 1 test 0.8536585365853658
-    metrics = MetricsHolder(y_test,y_pred)
+    metrics = MetricsHolder(y_test,y_pred,scores)
 
     print("")
-    print("RFC TEMPLATES ACC",metrics.calculate_accuracy())
+    print("RFC TEMPLATES RR",metrics.calculate_recognition_rate())
     print("RFC TEMPLATES Precision",metrics.calculate_weighted_precision())
     print("RFC TEMPLATES Recall",metrics.calculate_weighted_recall())
     print("RFC TEMPLATES F1-Score",metrics.calculate_weighted_f1_score())
+
+    metrics.plot_cmc_curve()
+
 
